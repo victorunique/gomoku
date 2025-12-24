@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gomoku Challenge | AI Edition</title>
+    <style>
+        :root {
+            /* Vibrant, Child-Friendly Palette */
+            --bg-color: #e0f7fa; /* Light Cyan */
+            --board-color: #f0d9b5; /* Wood texture simulation */
+            --grid-line-color: #8d6e63;
+            --stone-black: #212121;
+            --stone-white: #f5f5f5;
+            --primary-btn: #ff7043; /* Coral */
+            --primary-btn-hover: #f4511e;
+            --text-color: #37474f;
+            --accent-green: #66bb6a;
+            --accent-blue: #42a5f5;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: var(--text-color);
+        }
+
+        h1 {
+            color: var(--primary-btn);
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+
+        .game-container {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 95vw;
+        }
+
+        /* Controls Area */
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        select, button {
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: bold;
+        }
+
+        select {
+            background-color: var(--accent-blue);
+            color: white;
+            appearance: none; /* Custom chevron handled by padding usually, keep simple here */
+            text-align: center;
+        }
+
+        button {
+            background-color: var(--primary-btn);
+            color: white;
+        }
+
+        button:hover, select:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Status Display */
+        .status-bar {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding: 10px 25px;
+            border-radius: 15px;
+            background-color: #fff3e0;
+            border: 2px solid var(--primary-btn);
+            min-width: 200px;
+            text-align: center;
+        }
+
+        /* The Game Board */
+        #gomoku-board {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            background-color: var(--board-color);
+            width: min(90vw, 600px);
+            height: min(90vw, 600px);
+            border: 5px solid #5d4037;
+            border-radius: 4px;
+            position: relative;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        /* Individual Cells */
+        .cell {
+            position: relative;
+            cursor: pointer;
+        }
+
+        /* Grid Lines */
+        .cell::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background-color: var(--grid-line-color);
+            z-index: 0;
+        }
+
+        .cell::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            height: 100%;
+            width: 1px;
+            background-color: var(--grid-line-color);
+            z-index: 0;
+        }
+
+        /* Stones */
+        .stone {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            margin: 10%;
+            position: relative;
+            z-index: 1;
+            transform: scale(0);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+        }
+
+        @keyframes popIn {
+            to { transform: scale(1); }
+        }
+
+        .stone.black {
+            background: radial-gradient(circle at 30% 30%, #555, #000);
+        }
+
+        .stone.white {
+            background: radial-gradient(circle at 30% 30%, #fff, #ddd);
+        }
+
+        /* Last Move Marker */
+        .last-move::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30%;
+            height: 30%;
+            background-color: rgba(255, 0, 0, 0.6);
+            border-radius: 50%;
+            z-index: 2;
+        }
+
+        /* Overlay for Game Over */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .overlay.active {
+            display: flex;
+        }
+
+        .message-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            animation: slideDown 0.4s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .message-title {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: var(--primary-btn);
+        }
+
+        .close-btn {
+            background-color: var(--accent-green);
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Five-in-a-Row</h1>
+
+    <div class="game-container">
+        <div class="controls">
+            <select id="difficulty">
+                <option value="easy">Level: Easy</option>
+                <option value="normal" selected>Level: Normal</option>
+                <option value="hard">Level: Hard</option>
+            </select>
+            <button onclick="game.resetGame()">Restart Game</button>
+        </div>
+
+        <div id="status" class="status-bar">Your Turn (Black)</div>
+
+        <div id="gomoku-board">
+            <!-- Grid generated by JS -->
+        </div>
+    </div>
+
+    <div id="gameOverOverlay" class="overlay">
+        <div class="message-box">
+            <div id="winnerText" class="message-title">You Won!</div>
+            <button class="close-btn" onclick="game.resetGame()">Play Again</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * Gomoku Game Engine
+ * Author: Gemini
+ * For: Victor Xu
+ * * Includes a heuristic evaluation AI for the 'Hard' difficulty.
+ */
+
+const BOARD_SIZE = 15;
+const EMPTY = 0;
+const BLACK = 1; // Human
+const WHITE = 2; // AI
+
+class GomokuGame {
+    constructor() {
+        this.board = [];
+        this.gameActive = false;
+        this.currentPlayer = BLACK;
+        this.difficulty = 'normal';
+        this.lastMove = null;
+        
+        this.boardElement = document.getElementById('gomoku-board');
+        this.statusElement = document.getElementById('status');
+        this.overlay = document.getElementById('gameOverOverlay');
+        this.winnerText = document.getElementById('winnerText');
+        this.difficultySelect = document.getElementById('difficulty');
+
+        this.difficultySelect.addEventListener('change', (e) => {
+            this.difficulty = e.target.value;
+            this.resetGame();
+        });
+
+        this.initBoardUI();
+        this.resetGame();
+    }
+
+    // Initialize the CSS Grid and Click Listeners
+    initBoardUI() {
+        this.boardElement.innerHTML = '';
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.dataset.x = x;
+                cell.dataset.y = y;
+                cell.addEventListener('click', () => this.handleHumanMove(x, y));
+                this.boardElement.appendChild(cell);
+            }
+        }
+    }
+
+    resetGame() {
+        // Reset Logic
+        this.board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(EMPTY));
+        this.gameActive = true;
+        this.currentPlayer = BLACK; // Human always starts
+        this.lastMove = null;
+        this.overlay.classList.remove('active');
+        
+        // Reset UI
+        const cells = document.querySelectorAll('.cell');
+        cells.forEach(cell => {
+            cell.innerHTML = '';
+            cell.classList.remove('last-move');
+        });
+        
+        this.updateStatus("Your Turn (Black)");
+    }
+
+    updateStatus(message) {
+        this.statusElement.textContent = message;
+    }
+
+    handleHumanMove(x, y) {
+        if (!this.gameActive || this.currentPlayer !== BLACK) return;
+        if (this.board[y][x] !== EMPTY) return;
+
+        this.makeMove(x, y, BLACK);
+
+        if (this.checkWin(x, y, BLACK)) {
+            this.endGame("You Win!");
+            return;
+        }
+
+        this.currentPlayer = WHITE;
+        this.updateStatus("AI Thinking...");
+        
+        // Small delay to let UI render and simulate thinking
+        setTimeout(() => this.aiTurn(), 500);
+    }
+
+    makeMove(x, y, player) {
+        this.board[y][x] = player;
+        this.lastMove = {x, y};
+
+        // Render visual
+        const index = y * BOARD_SIZE + x;
+        const cell = this.boardElement.children[index];
+        
+        const stone = document.createElement('div');
+        stone.classList.add('stone', player === BLACK ? 'black' : 'white');
+        cell.appendChild(stone);
+
+        // Highlight last move
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('last-move'));
+        cell.classList.add('last-move');
+    }
+
+    aiTurn() {
+        if (!this.gameActive) return;
+
+        let move;
+        const diff = this.difficulty;
+
+        if (diff === 'easy') {
+            move = this.getEasyMove();
+        } else if (diff === 'normal') {
+            move = this.getNormalMove();
+        } else {
+            move = this.getHardMove();
+        }
+
+        if (move) {
+            this.makeMove(move.x, move.y, WHITE);
+            if (this.checkWin(move.x, move.y, WHITE)) {
+                this.endGame("AI Wins!");
+            } else if (this.isBoardFull()) {
+                this.endGame("It's a Draw!");
+            } else {
+                this.currentPlayer = BLACK;
+                this.updateStatus("Your Turn (Black)");
+            }
+        }
+    }
+
+    endGame(message) {
+        this.gameActive = false;
+        this.winnerText.textContent = message;
+        // Small delay before showing overlay
+        setTimeout(() => {
+            this.overlay.classList.add('active');
+        }, 800);
+    }
+
+    isBoardFull() {
+        return this.board.every(row => row.every(cell => cell !== EMPTY));
+    }
+
+    // ---------------------------------------------------------
+    // WIN DETECTION LOGIC
+    // ---------------------------------------------------------
+    checkWin(x, y, player) {
+        const directions = [
+            [1, 0],  // Horizontal
+            [0, 1],  // Vertical
+            [1, 1],  // Diagonal \
+            [1, -1]  // Diagonal /
+        ];
+
+        for (let [dx, dy] of directions) {
+            let count = 1;
+            
+            // Check forward
+            let i = 1;
+            while (this.isValid(x + dx * i, y + dy * i) && this.board[y + dy * i][x + dx * i] === player) {
+                count++;
+                i++;
+            }
+            
+            // Check backward
+            i = 1;
+            while (this.isValid(x - dx * i, y - dy * i) && this.board[y - dy * i][x - dx * i] === player) {
+                count++;
+                i++;
+            }
+
+            if (count >= 5) return true;
+        }
+        return false;
+    }
+
+    isValid(x, y) {
+        return x >= 0 && x < BOARD_SIZE && y >= 0 && y < BOARD_SIZE;
+    }
+
+    // ---------------------------------------------------------
+    // AI LOGIC
+    // ---------------------------------------------------------
+
+    // LEVEL: EASY
+    // Randomly picks a spot, prioritising center slightly if empty
+    getEasyMove() {
+        const emptyCells = [];
+        for(let y=0; y<BOARD_SIZE; y++) {
+            for(let x=0; x<BOARD_SIZE; x++) {
+                if(this.board[y][x] === EMPTY) emptyCells.push({x, y});
+            }
+        }
+        if(emptyCells.length === 0) return null;
+        return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    }
+
+    // LEVEL: NORMAL
+    // Blocks immediate threats (4 in a row) or extends own lines.
+    // Uses a simplified scoring system.
+    getNormalMove() {
+        return this.getBestMoveByScore(false); // False = low depth/simple heuristics
+    }
+
+    // LEVEL: HARD
+    // Uses advanced pattern matching to detect Open 3s, Broken 3s, etc.
+    // Aggressive attack and defense calculation.
+    getHardMove() {
+        return this.getBestMoveByScore(true);
+    }
+
+    getBestMoveByScore(advanced) {
+        let maxScore = -Infinity;
+        let bestMoves = [];
+
+        // Center start is usually best if board is empty
+        if (this.board[7][7] === EMPTY && this.board.flat().filter(c => c !== EMPTY).length === 0) {
+            return {x: 7, y: 7};
+        }
+
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                if (this.board[y][x] === EMPTY) {
+                    // Optimization: only check cells neighbors to existing stones
+                    if (!this.hasNeighbor(x, y) && this.board.flat().filter(c => c !== EMPTY).length > 0) continue;
+
+                    let score;
+                    if (advanced) {
+                        score = this.evaluatePointHard(x, y);
+                    } else {
+                        score = this.evaluatePointNormal(x, y);
+                    }
+
+                    if (score > maxScore) {
+                        maxScore = score;
+                        bestMoves = [{x, y}];
+                    } else if (score === maxScore) {
+                        bestMoves.push({x, y});
+                    }
+                }
+            }
+        }
+
+        // If no moves found (shouldn't happen), pick random
+        if (bestMoves.length === 0) return this.getEasyMove();
+        
+        // Pick random from best moves to vary gameplay slightly
+        return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    }
+
+    hasNeighbor(x, y) {
+        for(let dy=-1; dy<=1; dy++){
+            for(let dx=-1; dx<=1; dx++){
+                if(dx===0 && dy===0) continue;
+                if(this.isValid(x+dx, y+dy) && this.board[y+dy][x+dx] !== EMPTY) return true;
+            }
+        }
+        return false;
+    }
+
+    // Normal Heuristic: Counts consecutive stones
+    evaluatePointNormal(x, y) {
+        let score = 0;
+        // Attack Score (AI)
+        score += this.countConsecutive(x, y, WHITE) * 1.1; 
+        // Defense Score (Human) - block him!
+        score += this.countConsecutive(x, y, BLACK);
+        return score;
+    }
+
+    countConsecutive(x, y, player) {
+        let maxLine = 0;
+        const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+        
+        for (let [dx, dy] of directions) {
+            let count = 0;
+            // Check strictly consecutive stones
+            for(let i=1; i<5; i++) {
+                if(this.isValid(x+dx*i, y+dy*i) && this.board[y+dy*i][x+dx*i] === player) count++;
+                else break;
+            }
+            for(let i=1; i<5; i++) {
+                if(this.isValid(x-dx*i, y-dy*i) && this.board[y-dy*i][x-dx*i] === player) count++;
+                else break;
+            }
+            maxLine = Math.max(maxLine, count);
+        }
+        
+        // Weight heavily for 4s and 5s
+        if (maxLine >= 4) return 10000;
+        if (maxLine === 3) return 1000;
+        if (maxLine === 2) return 100;
+        return maxLine;
+    }
+
+    // Hard Heuristic: Pattern Matching
+    // Evaluates "Shape" of lines (e.g., Live 3 vs Dead 3)
+    evaluatePointHard(x, y) {
+        let attackScore = this.getPatternScore(x, y, WHITE);
+        let defenseScore = this.getPatternScore(x, y, BLACK);
+
+        // AI tends to be slightly more aggressive in Hard mode,
+        // but if human has a win (score >= 10000), we MUST block.
+        if (defenseScore >= 20000) return 200000; // Emergency block
+        if (attackScore >= 20000) return 190000; // Take win
+
+        return attackScore + defenseScore;
+    }
+
+    getPatternScore(x, y, player) {
+        let totalScore = 0;
+        const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+
+        for (let [dx, dy] of directions) {
+            // Construct a string of the line centered at x,y
+            // 0 = empty, 1 = player, 2 = enemy (boundary or opposite stone)
+            let lineStr = "";
+            
+            // Look 4 steps backward
+            for(let i=4; i>0; i--) {
+                const nx = x - dx*i;
+                const ny = y - dy*i;
+                if(!this.isValid(nx, ny)) lineStr += "2"; // Wall
+                else if(this.board[ny][nx] === player) lineStr += "1";
+                else if(this.board[ny][nx] === EMPTY) lineStr += "0";
+                else lineStr += "2"; // Enemy
+            }
+            
+            lineStr += "1"; // The move we are considering
+            
+            // Look 4 steps forward
+            for(let i=1; i<=4; i++) {
+                const nx = x + dx*i;
+                const ny = y + dy*i;
+                if(!this.isValid(nx, ny)) lineStr += "2";
+                else if(this.board[ny][nx] === player) lineStr += "1";
+                else if(this.board[ny][nx] === EMPTY) lineStr += "0";
+                else lineStr += "2";
+            }
+
+            totalScore += this.scorePattern(lineStr);
+        }
+        return totalScore;
+    }
+
+    // Regex-like pattern scoring
+    // 1 is our stone, 0 is empty, 2 is blocked
+    scorePattern(str) {
+        // Guaranteed Win (5 in a row)
+        if (str.includes("11111")) return 100000;
+        
+        // Open 4 (Live 4) - 011110 -> Unstoppable win next turn
+        if (str.includes("011110")) return 20000;
+        
+        // Dead 4 (Sleep 4) - 211110 or 011112 -> Must block/play
+        if (str.includes("211110") || str.includes("011112")) return 5000;
+        if (str.includes("11101") || str.includes("10111") || str.includes("11011")) return 4000; // Broken 4
+
+        // Open 3 (Live 3) - 01110 -> Huge threat
+        if (str.includes("01110") || str.includes("010110") || str.includes("011010")) return 3000;
+
+        // Sleep 3
+        if (str.includes("211100") || str.includes("001112")) return 500;
+        
+        // Open 2
+        if (str.includes("0110") || str.includes("01010") || str.includes("00110")) return 200;
+
+        return 1;
+    }
+}
+
+// Start the game
+const game = new GomokuGame();
+
+</script>
+</body>
+</html>
